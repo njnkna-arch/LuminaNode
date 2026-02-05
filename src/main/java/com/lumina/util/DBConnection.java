@@ -4,8 +4,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 
 /**
- * データベース接続を管理するクラス。
- * MySQL 9.x (Railway) の最新セキュリティ設定に対応した最終版です。
+ * データベース接続管理。
+ * RailwayのMySQL 9.x系で発生する「Public Key Retrieval」や「SSL」のエラーを
+ * 完全に回避するための接続文字列を設定しています。
  */
 public class DBConnection {
     public static Connection getConnection() throws Exception {
@@ -20,18 +21,18 @@ public class DBConnection {
         String pass = System.getenv("MYSQLPASSWORD");
 
         String url;
-        if (host != null) {
-            // 【重要】最新のMySQLに対応するため、末尾にセキュリティ許可設定をすべて追加しました
+        if (host != null && !host.isEmpty()) {
+            // 【重要】最新のMySQLに対応するためのURLオプションをすべて含めています
             url = String.format(
                 "jdbc:mysql://%s:%s/%s?serverTimezone=JST" +
                 "&useUnicode=true&characterEncoding=UTF-8" +
                 "&allowPublicKeyRetrieval=true" +
-                "&useSSL=false" +
-                "&connectionAttributes=program_name:LuminaApp", 
+                "&useSSL=false", 
                 host, port, dbName
             );
+            System.out.println("🚀 Railway DBに接続中: " + host);
         } else {
-            // ローカル（Eclipse）用
+            // ローカル（Eclipse）環境用
             url = "jdbc:mysql://localhost:3306/luminadb?serverTimezone=JST&allowPublicKeyRetrieval=true&useSSL=false";
             user = "root";
             pass = "root"; 
