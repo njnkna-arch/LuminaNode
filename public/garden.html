@@ -210,10 +210,15 @@
                                     <h1 className="text-xl font-bold tracking-[0.4em] uppercase italic font-serif leading-none">LUMINA</h1>
                                     <p className="text-[8px] text-white/40 font-mono tracking-widest uppercase mt-1">ID: {groupId}</p>
                                 </div>
+                                {/* 閉園ボタンを一時的に無効化（opacityを下げてonClickを削除） */}
                                 <button 
+                                    className="w-11 h-11 orb-button flex items-center justify-center text-stone-500 opacity-20 cursor-not-allowed rounded-full transition-all"
+                                    title="現在、閉園機能は無効化されています"
+                                >
+                                    {/*<button 
                                     onClick={() => setConfirmModal({ show: true, type: 'garden', target: null })} 
                                     className="w-11 h-11 orb-button flex items-center justify-center text-red-400 rounded-full transition-all active:scale-90"
-                                >
+                                >*/}
                                     <Icons.Trash />
                                 </button>
                             </div>
