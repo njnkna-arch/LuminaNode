@@ -3,156 +3,287 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUMINA - Garden of Memories</title>
+    <title>LUMINA - Garden</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #faf9f6; color: #44403c; }
+        body { font-family: 'Inter', sans-serif; background-color: #faf9f6; color: #44403c; overflow: hidden; }
         .font-serif { font-family: 'Playfair Display', serif; }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tree-transition { transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .item-float { animation: float 6s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translate(-50%, -52%) scale(1); } 50% { transform: translate(-50%, -48%) scale(1.05); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
+
+        const Icons = {
+            ChevronLeft: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+            ChevronRight: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
+            Camera: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>,
+            Home: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+            Trash: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            X: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>,
+            Loader: () => <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        };
+
+        const TreeGraphic = ({ entries = [], size = "large" }) => {
+            const count = entries.length;
+            const scale = count >= 10 ? 1.6 : count >= 5 ? 1.3 : 1.0;
+            const w = size === "small" ? 48 : 450;
+            const h = size === "small" ? 34 : 280;
+            
+            return (
+                <div className="flex justify-center tree-transition" style={{ transform: `scale(${scale})`, transformOrigin: 'bottom' }}>
+                    <svg width={w} height={h} viewBox="0 0 200 120">
+                        <path d="M90 120 Q100 115 100 100 T110 120" fill="#8b7e74" />
+                        <path d="M5 90 Q5 10 100 5 T195 90 Q195 110 100 115 T5 90" fill={count > 0 ? "#34d399" : "#f1f5f9"} opacity="0.85" />
+                        <path d="M100 100 L100 50 M100 85 L40 65 M100 80 L160 60 M100 70 L65 35 M100 65 L135 30" stroke="#fff" strokeWidth="1" opacity="0.4" fill="none" />
+                    </svg>
+                </div>
+            );
+        };
 
         function App() {
-            const [view, setView] = useState('list');
-            const [diaries, setDiaries] = useState([]);
-            const [authMode, setAuthMode] = useState(null);
-            const [authIn, setAuthIn] = useState({ name: '', host: '', pass: '', loginId: '' });
+            const params = new URLSearchParams(window.location.search);
+            const groupId = params.get('groupId') || 'DEMO';
 
-            useEffect(() => {
-                // 庭園一覧の取得
-                fetch('/api/list')
+            const [currentMonth, setCurrentMonth] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(new Date());
+            const [entries, setEntries] = useState([]);
+            const [isFormOpen, setIsFormOpen] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+            const [entryIn, setEntryIn] = useState({ message: '', photo: null, color: '#FAF9F6' });
+
+            const fetchEntries = () => {
+                fetch(`/api/entries?groupId=${groupId}`)
                     .then(r => r.json())
-                    .then(data => { if(Array.isArray(data)) setDiaries(data); })
-                    .catch(e => console.error("Fetch error:", e));
-            }, []);
-
-            // 特定の庭園へ遷移する関数
-            const goToGarden = (groupId) => {
-                window.location.href = `garden.html?groupId=${groupId}`;
+                    .then(data => { if(Array.isArray(data)) setEntries(data); })
+                    .catch(console.error);
             };
 
-            const handleAuth = (type) => {
-                const endpoint = type === 'create' ? '/api/create' : '/api/login_check';
-                fetch(endpoint, {
+            useEffect(() => {
+                fetchEntries();
+            }, [groupId]);
+
+            const calendarDays = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= lastDate; i++) days.push(i);
+                return days;
+            }, [currentMonth]);
+
+            const getFormattedDate = (date) => {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            };
+
+            const handleAddEntry = async () => {
+                const msg = entryIn.message.trim();
+                if ((!msg && !entryIn.photo) || isSaving) return;
+                
+                setIsSaving(true);
+                try {
+                    const res = await fetch('/api/addEntry', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            groupId,
+                            date: getFormattedDate(selectedDate),
+                            message: msg,
+                            photo: entryIn.photo,
+                            color: entryIn.color
+                        })
+                    });
+                    const data = await res.json();
+                    if(data.success) {
+                        fetchEntries();
+                        setEntryIn({ message: '', photo: null, color: '#FAF9F6' });
+                        setIsFormOpen(false);
+                    }
+                } catch (e) { alert("保存できませんでした"); }
+                finally { setIsSaving(false); }
+            };
+
+            const handleDeleteEntry = (id) => {
+                if(!confirm("この記録を削除しますか？")) return;
+                fetch('/api/deleteEntry', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(authIn)
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.id || data.success) {
-                        alert(type === 'create' ? "庭園を作成しました！ ID: " + data.id : "ログインしました");
-                        if (type === 'create' && data.id) {
-                            goToGarden(data.id);
-                        } else {
-                            window.location.reload(); 
-                        }
-                    } else {
-                        alert("エラー: " + (data.error || "詳細不明"));
-                    }
+                    body: JSON.stringify({ entryId: id })
+                }).then(() => fetchEntries());
+            };
+
+            const handleCloseGarden = () => {
+                if(!confirm("本当に閉園しますか？\n庭園とすべての記録が消去され、元に戻せません。")) return;
+                fetch('/api/closeGarden', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groupId })
+                }).then(() => {
+                    alert("庭園を閉鎖しました");
+                    window.location.href = 'index.html';
                 });
             };
 
-            if (view === 'list') {
-                return (
-                    <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col fade-in">
-                        <header className="text-center mt-12 mb-10">
-                            <h1 className="text-5xl font-serif font-bold text-stone-800 tracking-tight italic">LUMINA</h1>
-                            <p className="text-stone-400 text-[10px] tracking-[0.4em] uppercase mt-2 font-semibold">Garden of Memories</p>
-                        </header>
+            const currentEntries = useMemo(() => {
+                const ds = getFormattedDate(selectedDate);
+                return entries.filter(e => e.diary_date.startsWith(ds));
+            }, [entries, selectedDate]);
 
-                        <main className="flex-1 overflow-y-auto no-scrollbar">
-                            <div className="flex justify-between items-baseline mb-4">
-                                <h2 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Garden List</h2>
-                                <span className="text-[9px] text-stone-300 font-mono">{diaries.length} Gardens</span>
+            return (
+                <div className="max-w-md mx-auto h-screen bg-white flex flex-col relative overflow-hidden fade-in">
+                    <header className="flex justify-between items-center px-6 pt-6 pb-2 shrink-0 z-20">
+                        <button onClick={() => window.location.href = 'index.html'} className="p-2 text-stone-400 hover:bg-stone-100 rounded-full transition-colors">
+                            <Icons.Home />
+                        </button>
+                        <div className="text-center">
+                            <h1 className="text-sm font-bold text-stone-300 tracking-[0.3em] uppercase italic font-serif">LUMINA</h1>
+                            <p className="text-[9px] text-stone-400 font-mono tracking-tighter opacity-70">ID: {groupId}</p>
+                        </div>
+                        <button onClick={handleCloseGarden} className="p-2 text-stone-300 hover:text-red-400 hover:bg-red-50 rounded-full transition-colors">
+                            <Icons.Trash />
+                        </button>
+                    </header>
+
+                    <section className="px-6 py-2 shrink-0 z-10">
+                        <div className="flex justify-between items-center mb-3">
+                            <h2 className="text-2xl font-serif font-bold text-stone-800 tracking-tight">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-1.5 text-stone-300 hover:text-stone-600 transition-colors"><Icons.ChevronLeft /></button>
+                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-1.5 text-stone-300 hover:text-stone-600 transition-colors"><Icons.ChevronRight /></button>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-[2rem] shadow-xl border border-stone-50 p-3">
+                            <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                                {['日','月','火','水','木','金','土'].map((d, i) => (
+                                    <span key={d} className={`text-[9px] font-bold ${i===0 ? 'text-red-300' : i===6 ? 'text-blue-300' : 'text-stone-300'}`}>{d}</span>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-7 gap-1">
+                                {calendarDays.map((day, i) => {
+                                    if (!day) return <div key={`empty-${i}`} className="aspect-square" />;
+                                    const ds = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth()+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                                    const dayEntries = entries.filter(e => e.diary_date.startsWith(ds));
+                                    const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth.getMonth();
+                                    return (
+                                        <div key={day} onClick={() => setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))} 
+                                             className={`aspect-square relative border border-stone-50 flex flex-col items-center justify-end p-0.5 cursor-pointer transition-all rounded-lg ${isSelected ? 'ring-2 ring-stone-800 bg-stone-50 z-10 shadow-sm scale-105' : 'hover:bg-stone-50/50'}`}>
+                                            <span className={`absolute top-0.5 left-1 text-[7px] font-bold ${isSelected ? 'text-stone-800' : 'text-stone-200'}`}>{day}</span>
+                                            <TreeGraphic entries={dayEntries} size="small" />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="flex-1 px-6 py-4 flex flex-col overflow-hidden relative z-10">
+                        <h3 className="text-xl font-serif font-bold text-stone-800 mb-2">
+                            {selectedDate.toLocaleDateString('ja-JP', {month:'long', day:'numeric', weekday:'short'})}
+                        </h3>
+                        <div className="relative w-full flex-1 bg-stone-50/40 rounded-[3rem] overflow-hidden border border-stone-100 flex items-end justify-center p-6 shadow-inner">
+                            <div className="absolute bottom-4 w-full flex justify-center scale-[1.7]">
+                                <TreeGraphic entries={currentEntries} />
                             </div>
                             
-                            <div className="space-y-3">
-                                {diaries.length === 0 ? (
-                                    <div className="py-20 text-center text-stone-300 italic border-2 border-dashed border-stone-100 rounded-[2.5rem]">
-                                        庭園がまだありません
-                                    </div>
-                                ) : (
-                                    diaries.map(d => (
-                                        <div 
-                                            key={d.group_id} 
-                                            onClick={() => goToGarden(d.group_id)}
-                                            className="bg-white p-6 rounded-[2rem] shadow-sm border border-stone-50 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all flex justify-between items-center group"
-                                        >
-                                            <div className="flex-1">
-                                                <h3 className="font-bold text-stone-700 text-lg group-hover:text-stone-900 transition-colors">{d.group_name}</h3>
-                                                <div className="flex gap-4 mt-1">
-                                                    <p className="text-[10px] text-stone-300 font-mono uppercase tracking-tighter">ID: {d.group_id}</p>
-                                                    <p className="text-[10px] text-stone-400">Host: {d.host_name}</p>
+                            <div className="relative z-10 w-full h-full mb-12">
+                                {currentEntries.map((item, idx) => (
+                                    <div key={item.id} className="absolute item-float group" style={{top: `${15+(idx%5)*15}%`, left: `${15+(idx%4)*22}%`, transform: 'translate(-50%, -50%)'}}>
+                                        <div className="p-1.5 bg-white shadow-2xl rounded-2xl border border-stone-50 relative transition-all hover:scale-110">
+                                            {item.image_data ? 
+                                                <img src={item.image_data} className="w-20 h-20 object-cover rounded-xl shadow-sm" /> :
+                                                <div className="w-20 h-20 flex items-center justify-center bg-stone-50 rounded-xl text-[10px] text-stone-500 text-center leading-tight px-3 font-medium overflow-hidden italic shadow-inner">
+                                                    {item.message}
                                                 </div>
-                                            </div>
-                                            <div className="text-stone-200 group-hover:text-stone-400 transition-colors">
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-                                            </div>
+                                            }
+                                            {item.image_data && item.message && (
+                                                <div className="absolute -bottom-2 -left-2 bg-white/95 backdrop-blur-md px-2 py-1 rounded-md text-[8px] shadow-sm max-w-[100px] truncate border border-stone-100 text-stone-600 font-medium">
+                                                    {item.message}
+                                                </div>
+                                            )}
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteEntry(item.id); }}
+                                                className="absolute -top-3 -right-3 bg-red-400 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-red-500 scale-90"
+                                            >
+                                                <Icons.X />
+                                            </button>
+                                            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{backgroundColor: item.color}} />
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        </main>
-
-                        <footer className="mt-8 space-y-4 pb-6">
-                            <div className="flex gap-4">
-                                <button 
-                                    onClick={() => setAuthMode(authMode === 'create' ? null : 'create')} 
-                                    className={`flex-1 py-4 rounded-2xl font-bold border transition-all shadow-sm ${authMode === 'create' ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-600 border-stone-100'}`}
-                                >
-                                    新規作成
-                                </button>
-                            </div>
-
-                            {authMode === 'create' && (
-                                <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border border-stone-50 space-y-3 fade-in">
-                                    <div className="px-2">
-                                        <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">New Garden Setup</h4>
-                                        <p className="text-[9px] text-stone-300">データベース整合性のため全ての項目を入力してください</p>
                                     </div>
-                                    <input 
-                                        placeholder="庭園の名前" 
-                                        className="w-full p-4 bg-stone-50 rounded-2xl outline-none text-sm border border-transparent focus:border-stone-100 transition-all" 
-                                        value={authIn.name} 
-                                        onChange={e => setAuthIn({...authIn, name: e.target.value})} 
-                                    />
-                                    <input 
-                                        placeholder="あなたの名前" 
-                                        className="w-full p-4 bg-stone-50 rounded-2xl outline-none text-sm border border-transparent focus:border-stone-100 transition-all" 
-                                        value={authIn.host} 
-                                        onChange={e => setAuthIn({...authIn, host: e.target.value})} 
-                                    />
-                                    <input 
-                                        type="password" 
-                                        placeholder="パスワード（保存用）" 
-                                        className="w-full p-4 bg-stone-50 rounded-2xl outline-none text-sm border border-transparent focus:border-stone-100 transition-all" 
-                                        value={authIn.pass} 
-                                        onChange={e => setAuthIn({...authIn, pass: e.target.value})} 
-                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    <div className={`fixed inset-0 z-40 pointer-events-none transition-opacity duration-500 ${isFormOpen ? 'bg-stone-900/10 pointer-events-auto opacity-100' : 'opacity-0'}`} onClick={() => setIsFormOpen(false)} />
+                    <div className={`fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-stone-100 rounded-t-[3.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.08)] z-50 transition-transform duration-500 ease-in-out ${isFormOpen ? 'translate-y-0 h-1/2' : 'translate-y-[calc(100%-64px)] h-auto'}`}>
+                        <button onClick={() => setIsFormOpen(!isFormOpen)} className="w-full h-16 flex flex-col items-center justify-center text-stone-200 hover:text-stone-400 transition-colors">
+                            <div className="w-12 h-1 bg-stone-100 rounded-full mb-2" />
+                            {!isFormOpen && <span className="text-[10px] font-bold tracking-[0.4em] text-stone-300 uppercase italic font-serif">New Memory</span>}
+                        </button>
+                        <div className="px-8 pb-10 pt-2 space-y-6 overflow-y-auto no-scrollbar h-[calc(100%-64px)]">
+                            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
+                                {['#FAF9F6', '#ff85a2', '#f472b6', '#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f87171', '#555555'].map(c => (
+                                    <button key={c} onClick={() => setEntryIn({...entryIn, color: c})} className={`w-8 h-8 rounded-full border shrink-0 transition-all ${entryIn.color === c ? 'ring-2 ring-stone-800 scale-110 shadow-md' : 'border-stone-100'}`} style={{backgroundColor: c}} />
+                                ))}
+                            </div>
+                            <div className="flex gap-4 items-start">
+                                <div className="flex flex-col items-center gap-2">
+                                    <label className="w-20 h-20 shrink-0 flex items-center justify-center bg-stone-50 rounded-[1.5rem] text-stone-300 border border-stone-100 shadow-sm cursor-pointer hover:bg-stone-100 transition-all overflow-hidden relative group">
+                                        {entryIn.photo ? (
+                                            <img src={entryIn.photo} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Icons.Camera />
+                                        )}
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                                            const file = e.target.files[0];
+                                            if (!file) return;
+                                            const r = new FileReader(); 
+                                            r.onload = () => setEntryIn({...entryIn, photo: r.result}); 
+                                            r.readAsDataURL(file); 
+                                        }} />
+                                    </label>
+                                    {entryIn.photo && (
+                                        <button onClick={() => setEntryIn({...entryIn, photo: null})} className="text-[8px] text-red-400 font-bold uppercase tracking-widest">Remove</button>
+                                    )}
+                                </div>
+                                <div className="flex-1 flex flex-col gap-4">
+                                    <textarea placeholder="今、この瞬間の想いを..." rows={4} className="w-full bg-stone-50 rounded-[1.5rem] p-4 text-sm outline-none resize-none border border-stone-100 shadow-inner focus:bg-white transition-colors" value={entryIn.message} onChange={e => setEntryIn({...entryIn, message: e.target.value})} />
                                     <button 
-                                        onClick={() => handleAuth('create')} 
-                                        className="w-full py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all"
+                                        onClick={handleAddEntry} 
+                                        disabled={(!entryIn.message.trim() && !entryIn.photo) || isSaving} 
+                                        className={`w-full py-4 rounded-[1.5rem] flex items-center justify-center font-bold shadow-lg active:scale-95 transition-all
+                                            ${((!entryIn.message.trim() && !entryIn.photo) || isSaving) 
+                                                ? 'bg-stone-100 text-stone-300 cursor-not-allowed border border-stone-50' 
+                                                : 'bg-stone-800 text-white hover:bg-stone-900'}`}
                                     >
-                                        開園する
+                                        {isSaving ? <Icons.Loader /> : '想い出を庭園に飾る'}
                                     </button>
                                 </div>
-                            )}
-                        </footer>
+                            </div>
+                        </div>
                     </div>
-                );
-            }
-            return <div className="p-10 text-center">App View (Coming soon)</div>;
+
+                    <footer className="py-2 text-center text-stone-300 text-[8px] tracking-[0.4em] uppercase z-10 font-bold">
+                        &copy; 2024 LUMINA DESIGN STUDIO
+                    </footer>
+                </div>
+            );
         }
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
