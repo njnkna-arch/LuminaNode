@@ -269,15 +269,15 @@
                         </div>
                     </section>
 
-                    {/* 登録用ハーフシート：常に160px分見えるように設定 */}
+                    {/* 登録用ハーフシート：初期露出高さを110pxに下げて色が半分見える位置に調整 */}
                     <div className={`fixed inset-x-0 bottom-0 z-40 pointer-events-none transition-opacity duration-500 ${isFormOpen ? 'bg-stone-900/20 pointer-events-auto opacity-100' : 'opacity-0'}`} onClick={() => setIsFormOpen(false)} />
-                    <div className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-stone-100 rounded-t-[4rem] shadow-[0_-25px_60px_rgba(0,0,0,0.1)] z-50 transition-transform duration-500 ease-in-out ${isFormOpen ? 'translate-y-0 h-[60%]' : 'translate-y-[calc(100%-160px)] h-auto'}`}>
+                    <div className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-stone-100 rounded-t-[4rem] shadow-[0_-25px_60px_rgba(0,0,0,0.1)] z-50 transition-transform duration-500 ease-in-out ${isFormOpen ? 'translate-y-0 h-[75%]' : 'translate-y-[calc(100%-110px)] h-auto'}`}>
                         <button onClick={() => setIsFormOpen(!isFormOpen)} className="w-full h-16 flex flex-col items-center justify-center text-stone-200 hover:text-stone-400 transition-colors shrink-0">
                             <div className="w-14 h-1 bg-stone-100 rounded-full mb-2" />
                             {!isFormOpen && <span className="text-[10px] font-bold tracking-[0.5em] text-stone-400 uppercase italic font-serif">NEW MEMORY</span>}
                         </button>
                         
-                        <div className="px-10 pb-8 pt-0 space-y-6 overflow-hidden flex flex-col h-full">
+                        <div className="px-10 pb-12 pt-0 space-y-6 overflow-hidden flex flex-col h-full">
                             <div className="flex gap-3 overflow-x-auto no-scrollbar py-2 shrink-0 justify-center">
                                 {['#FAF9F6', '#ff85a2', '#f472b6', '#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f87171', '#44403c'].map(c => (
                                     <button key={c} onClick={() => setEntryIn({...entryIn, color: c})} className={`w-9 h-9 rounded-full border shrink-0 transition-all ${entryIn.color === c ? 'ring-2 ring-stone-800 scale-110 shadow-lg' : 'border-stone-100 hover:scale-105'}`} style={{backgroundColor: c}} />
@@ -285,7 +285,7 @@
                             </div>
                             
                             <div className="flex gap-4 items-start flex-1 overflow-hidden">
-                                <div className="flex flex-col items-center gap-3">
+                                <div className="flex flex-col items-center gap-3 shrink-0">
                                     <label className="w-24 h-24 shrink-0 flex items-center justify-center bg-stone-50 rounded-[2.5rem] text-stone-300 border border-stone-100 shadow-sm cursor-pointer hover:bg-stone-100 transition-all overflow-hidden relative group">
                                         {entryIn.photo ? (
                                             <img src={entryIn.photo} className="w-full h-full object-cover" />
