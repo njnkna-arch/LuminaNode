@@ -1,1 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUMINA - Garden</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #faf9f6; color: #44403c; overflow-x: hidden; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .fade-in { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tree-transition { transition: all 1.2s ease-in-out; }
+        .item-float { animation: float 4s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translate(-50%, -52%) scale(1); } 50% { transform: translate(-50%, -48%) scale(1.05); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
+        const TreeGraphic = ({ entries = [], size = "large" }) => {
+            const count = entries.length;
+            const scale = count >= 10 ? 1.15 : count >= 5 ? 1.08 : 1.0;
+            return (
+                <div className="flex justify-center tree-transition" style={{ transform: `scale(${scale})`, transformOrigin: 'bottom' }}>
+                    <svg width={size === "small" ? 64 : 320} height={size === "small" ? 44 : 200} viewBox="0 0 200 120">
+                        <path d="M92 120 Q100 118 100 105 T108 120" fill="#D6D3D1" />
+                        <path d="M10 85 Q10 25 100 15 T190 85 Q190 100 100 105 T10 85" fill={count > 0 ? "#34d399" : "#f1f5f9"} opacity="0.8" />
+                        <path d="M100 100 L100 60 M100 90 L50 75 M100 85 L150 70 M100 80 L75 45 M100 75 L125 40" stroke="#fff" strokeWidth="0.8" opacity="0.3" fill="none" />
+                    </svg>
+                </div>
+            );
+        };
+
+        function App() {
+            // URLパラメータから ID を取得
+            const params = new URLSearchParams(window.location.search);
+            const groupId = params.get('groupId');
+
+            const [entries, setEntries] = useState([]);
+            const [selectedDate, setSelectedDate] = useState(new Date());
+            const [isFormOpen, setIsFormOpen] = useState(true);
+            const [entryIn, setEntryIn] = useState({ message: '', photo: null, color: '#FAF9F6' });
+
+            // APIのルートパス解決 (プレビュー環境での fetch エラー対策)
+            const apiRoot = window.location.origin.startsWith('blob') ? '' : window.location.origin;
+
+            const fetchEntries = () => {
+                if (!groupId) return;
+                fetch(`${apiRoot}/api/entries?groupId=${groupId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (Array.isArray(data)) setEntries(data);
+                    })
+                    .catch(e => console.error("Fetch entries error:", e));
+            };
+
+            useEffect(() => { 
+                if (!groupId) {
+                    // プレビュー環境 (blob:) ではリダイレクトできないためチェック
+                    if (!window.location.protocol.startsWith('blob')) {
+                        window.location.href = 'index.html';
+                    } else {
+                        console.warn("Redirect to index.html suppressed in preview environment.");
+                    }
+                    return;
+                }
+                fetchEntries(); 
+            }, [groupId]);
+
+            const handleAddEntry = () => {
+                if (!entryIn.message && !entryIn.photo) return;
+                fetch(`${apiRoot}/api/addEntry`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groupId, date: selectedDate.toISOString().split('T')[0], ...entryIn })
+                })
+                .then(r => r.json())
+                .then(() => {
+                    fetchEntries();
+                    setEntryIn({ message: '', photo: null, color: '#FAF9F6' });
+                })
+                .catch(e => console.error("Add entry error:", e));
+            };
+
+            const handleBack = () => {
+                if (!window.location.protocol.startsWith('blob')) {
+                    window.location.href = 'index.html';
+                } else {
+                    alert("プレビュー環境のため、エントランスへ戻るにはブラウザの戻るボタン、または index.html を直接開いてください。");
+                }
+            };
+
+            const currentEntries = useMemo(() => {
+                const ds = selectedDate.toISOString().split('T')[0];
+                return entries.filter(e => e.diary_date && e.diary_date.includes(ds));
+            }, [entries, selectedDate]);
+
+            return (
+                <div className={`max-w-md mx-auto min-h-screen bg-white p-4 transition-all duration-700 ${isFormOpen ? 'pb-56' : 'pb-16'} fade-in`}>
+                    <header className="flex justify-between items-center mb-6 px-2 mt-4">
+                        <button onClick={handleBack} className="p-2 text-stone-400 hover:text-stone-800 transition-colors">← エントランス</button>
+                        <div className="text-center">
+                            <h2 className="text-xl font-serif font-bold text-stone-800">Garden</h2>
+                            <p className="text-[9px] text-stone-300 font-mono uppercase">ID: {groupId || 'PREVIEW'}</p>
+                        </div>
+                        <div className="w-10"></div>
+                    </header>
+
+                    {/* カレンダー */}
+                    <section className="bg-white rounded-[2.5rem] shadow-xl border border-stone-50 p-4 mb-8">
+                        <div className="grid grid-cols-7 gap-1">
+                            {Array.from({length: 31}).map((_, i) => {
+                                const ds = `2026-02-${String(i+1).padStart(2,'0')}`;
+                                const dayEntries = entries.filter(e => e.diary_date && e.diary_date.includes(ds));
+                                return (
+                                    <div key={i} onClick={() => setSelectedDate(new Date(2026, 1, i+1))} className={`aspect-square relative border border-stone-50 flex flex-col items-center justify-end p-1 cursor-pointer transition-all ${selectedDate.getDate() === i+1 ? 'ring-2 ring-stone-800 bg-stone-50 z-10' : ''}`}>
+                                        <span className="absolute top-1 left-1.5 text-[8px] text-stone-300 font-bold">{i+1}</span>
+                                        <TreeGraphic entries={dayEntries} size="small" />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    {/* 巨木表示 */}
+                    <section className="fade-in mb-10">
+                        <div className="px-6 mb-2 text-3xl font-serif font-bold text-stone-800">{selectedDate.toLocaleDateString('ja-JP', {month:'long', day:'numeric'})}</div>
+                        <div className="relative w-full aspect-[4/3] bg-stone-50/30 rounded-[3.5rem] overflow-hidden border border-stone-100 flex items-end justify-center p-8 mt-4 shadow-inner">
+                            <div className="absolute bottom-8 w-full"><TreeGraphic entries={currentEntries} /></div>
+                            <div className="relative z-10 w-full h-full max-w-[260px] max-h-[140px] mb-12">
+                                {currentEntries.map((item, idx) => (
+                                    <div key={item.id || idx} className="absolute item-float" style={{top: `${20+(idx%4)*20}%`, left: `${15+(idx%5)*15}%`, transform: 'translate(-50%, -50%)'}}>
+                                        <div className="p-1 bg-white shadow-xl rounded-xl border border-stone-100 relative group">
+                                            {item.image_data && <img src={item.image_data} className="w-12 h-12 object-cover rounded-lg group-hover:scale-150 transition-transform" />}
+                                            <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white" style={{backgroundColor: item.color}} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 投稿フォーム */}
+                    <div className={`fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-stone-100 rounded-t-[3.5rem] shadow-2xl z-50 transition-transform duration-500 ${isFormOpen ? 'translate-y-0' : 'translate-y-[calc(100%-56px)]'}`}>
+                        <button onClick={() => setIsFormOpen(!isFormOpen)} className="w-full h-14 flex items-center justify-center text-stone-400 font-bold">
+                            {isFormOpen ? '▼ 閉じる' : '▲ 想い出を綴る'}
+                        </button>
+                        <div className="px-8 pb-10 pt-2 space-y-4">
+                            <div className="flex gap-4 items-center">
+                                <label className="w-16 h-16 flex items-center justify-center bg-stone-50 rounded-[1.5rem] text-stone-300 border shadow-sm cursor-pointer hover:bg-stone-100 transition-colors">
+                                    📸
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                                        const r = new FileReader(); 
+                                        r.onload = () => setEntryIn({...entryIn, photo: r.result}); 
+                                        r.readAsDataURL(e.target.files[0]); 
+                                    }} />
+                                </label>
+                                <textarea placeholder="今この瞬間を記録する..." rows={1} className="flex-1 bg-stone-50 rounded-[1.5rem] px-4 py-4 text-sm outline-none resize-none border shadow-sm" value={entryIn.message} onChange={e => setEntryIn({...entryIn, message: e.target.value})} />
+                                <button onClick={handleAddEntry} className="w-16 h-16 bg-stone-800 text-white rounded-[1.5rem] flex items-center justify-center font-bold text-2xl shadow-lg active:scale-95 transition-all">+</button>
+                            </div>
+                            {entryIn.photo && <img src={entryIn.photo} className="w-24 h-24 object-cover rounded-[2rem] border-4 border-white shadow-2xl fade-in" />}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
