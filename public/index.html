@@ -27,7 +27,6 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 環境変数から設定を取得。GitHubなどで自分で使う場合はここを自分のFirebase設定に書き換えます
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -55,7 +54,6 @@
             const [newGarden, setNewGarden] = useState({ name: '', host: '' });
             const [loading, setLoading] = useState(false);
 
-            // 1. Firebaseの認証（GitHub Pagesでも動くサーバーレス認証）
             useEffect(() => {
                 const initFirebase = async () => {
                     if (!window.FB_MODULES) return;
@@ -82,12 +80,10 @@
                 return () => clearInterval(timer);
             }, []);
 
-            // 2. 庭園リストの取得
             useEffect(() => {
                 if (!user || !window.FB_MODULES) return;
                 const { db, appId, collection, onSnapshot } = window.FB_MODULES;
                 
-                // データの保存場所を固定
                 const gardensCol = collection(db, 'artifacts', appId, 'public', 'data', 'gardens');
                 
                 const unsubscribe = onSnapshot(gardensCol, (snapshot) => {
@@ -98,7 +94,6 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // 検索フィルタリング
             const filteredGardens = useMemo(() => {
                 const term = searchTerm.toLowerCase();
                 return gardens.filter(g => 
@@ -108,10 +103,18 @@
             }, [gardens, searchTerm]);
 
             const goToGarden = (id) => {
-                window.location.href = `lumina_garden.html?groupId=${encodeURIComponent(id)}`;
+                const target = `lumina_garden.html?groupId=${encodeURIComponent(id)}`;
+                
+                // プレビュー環境でのデバッグ用
+                if (window.location.protocol.startsWith('blob')) {
+                    const msg = `庭園 ID: ${id} へ遷移します。\n(プレビュー環境ではページ遷移が制限されるため、GitHub Pagesなどの実際の環境で動作します)`;
+                    console.log("Navigation Target:", target);
+                    alert(msg);
+                } else {
+                    window.location.href = target;
+                }
             };
 
-            // 庭園の新規作成
             const handleCreate = async () => {
                 if (!newGarden.name.trim() || !user || !window.FB_MODULES) return;
                 setLoading(true);
@@ -121,15 +124,19 @@
                 
                 try {
                     const gardenDoc = doc(db, 'artifacts', appId, 'public', 'data', 'gardens', gardenId);
+                    
+                    // Firestoreへの保存を確実に待機
                     await setDoc(gardenDoc, {
                         group_name: newGarden.name,
                         host_name: newGarden.host || "匿名ホスト",
                         created_at: new Date().toISOString()
                     });
+                    
+                    // 保存成功後に遷移
                     goToGarden(gardenId);
                 } catch (e) {
-                    alert("作成できませんでした。");
-                    console.error(e);
+                    alert(`作成に失敗しました: ${e.message}`);
+                    console.error("Create Garden Error:", e);
                 } finally {
                     setLoading(false);
                 }
@@ -137,7 +144,6 @@
 
             return (
                 <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col fade-in relative overflow-x-hidden">
-                    {/* 背景装飾 */}
                     <div className="absolute top-[-5%] right-[-10%] opacity-10 pointer-events-none">
                         <svg width="300" height="300" viewBox="0 0 200 200">
                             <path d="M100,180 Q100,120 100,40" stroke="#8b7e74" strokeWidth="3" fill="none" />
@@ -150,7 +156,6 @@
                         <p className="text-stone-400 text-[10px] tracking-[0.4em] uppercase mt-2">Memory Garden Entrance</p>
                     </header>
 
-                    {/* 検索エリア */}
                     <div className="mb-6 relative z-10">
                         <div className="flex items-center bg-white border border-stone-100 rounded-2xl px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                             <span className="text-stone-300 mr-3"><Icons.Search /></span>
@@ -164,7 +169,6 @@
                         </div>
                     </div>
 
-                    {/* 庭園リスト */}
                     <main className="flex-1 overflow-y-auto no-scrollbar relative z-10">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Garden List</h2>
@@ -200,14 +204,13 @@
                         </div>
                     </main>
 
-                    {/* アクションエリア */}
                     <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 z-20 pointer-events-none">
                         <div className="pointer-events-auto bg-gradient-to-t from-stone-50 pt-10">
                             {isCreateMode ? (
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border border-stone-50 space-y-4 fade-in">
                                     <div className="flex justify-between items-center px-2">
                                         <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Open New Garden</h4>
-                                        <button onClick={() => setIsCreateMode(false)} className="text-stone-300 hover:text-stone-600">✕</button>
+                                        <button onClick={() => setIsCreateMode(false)} className="text-stone-300 hover:text-stone-600 p-1">✕</button>
                                     </div>
                                     <input 
                                         placeholder="庭園の名前" 
@@ -239,7 +242,6 @@
                                         <span>新しい庭園を造る</span>
                                     </button>
                                     
-                                    {/* パスワード忘れ防止の表示を維持 */}
                                     <div className="glass rounded-2xl p-4 space-y-2">
                                         <div className="flex justify-between items-center text-[8px] text-stone-400 font-bold uppercase border-b border-stone-100 pb-1">
                                             <span>Default Access</span>
