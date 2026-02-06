@@ -5,27 +5,31 @@ import java.sql.DriverManager;
 
 /**
  * データベース接続管理。
- * Railwayの内部ネットワーク（ポート3306）を使用し、
- * 環境変数から取得した情報のみで接続を確立する最小限の構成です。
+ * Railwayの環境変数を一切介さず、ソースコードに直接情報を書き込むことで
+ * 設定ミスを物理的に排除したデバッグ用・最短接続構成です。
  */
 public class DBConnection {
     public static Connection getConnection() throws Exception {
-        // 1. JDBCドライバのロード
+        // 1. ドライバのロード
         Class.forName("com.mysql.cj.jdbc.Driver");
         
-        // 2. RailwayのVariablesから値を直接取得
-        String host = System.getenv("MYSQLHOST");
-        String user = System.getenv("MYSQLUSER");
-        String pass = System.getenv("MYSQLPASSWORD");
-        String dbName = System.getenv("MYSQLDATABASE");
+        // 2. 接続情報を直接指定（ここを書き換えるだけでOK）
+        // Railway内部ネットワーク用の情報をそのまま打ち込みます
+        String host = "mysql.railway.internal";
+        String port = "3306";
+        String db   = "railway";
+        String user = "root";
+        
+        // あなたのMySQLのVariablesに表示されている「本物のパスワード」をここに直書きしてください
+        String pass = "gNRhijkJxPEVdgATFGvYmsMRpzVNuTFY"; 
 
         // 3. 接続URLの組み立て
-        // Railway内部ではポート3306で固定です。
-        // 最新MySQLの認証エラーを避けるための2つの必須オプションのみ付与しています。
-        String url = String.format("jdbc:mysql://%s:3306/%s?serverTimezone=JST&allowPublicKeyRetrieval=true&useSSL=false", 
-                                    host, dbName);
+        // 内部接続なので、ポートは必ず 3306 です。
+        String url = "jdbc:mysql://" + host + ":" + port + "/" + db + 
+                     "?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=JST";
 
-        // 4. 接続を実行して返す（失敗時は例外がそのままServletへ飛びます）
+        // 4. 接続して返す
+        // 万が一失敗した場合は、理由（パスワード間違い等）を例外として投げます
         return DriverManager.getConnection(url, user, pass);
     }
 }
