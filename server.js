@@ -4,11 +4,8 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
-// 画像データが含まれるため制限は維持するが、圧縮前提で10MBに調整
-app.use(express.json({ limit: '10mb' })); 
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-app.use(express.static('public'));
+// 最適化されたデータのみを受け入れるため、制限を最小限の2MBに設定
+app.use(express.json({ limit: '2mb' }), express.static('public'));
 
 const pool = mysql.createPool({
     host: process.env.MYSQLHOST,
@@ -16,63 +13,34 @@ const pool = mysql.createPool({
     password: process.env.MYSQLPASSWORD,
     database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT || 3306,
-    ssl: { rejectUnauthorized: false },
-    waitForConnections: true,
-    connectionLimit: 10,
-    // タイムアウトを防ぐ設定
-    connectTimeout: 10000 
+    ssl: { rejectUnauthorized: false }
 });
 
-// --- API ---
-
-// 一覧取得（画像データは重いので、ここでは取得しないのが高速化のコツ）
-app.get('/api/list', async (req, res) => {
+// 共通クエリ実行関数
+const q = async (res, sql, params) => {
     try {
-        const [rows] = await pool.query('SELECT group_id, group_name, host_name, updated_at FROM DIARY_GROUPS ORDER BY updated_at DESC');
-        res.json(rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
+        const [r] = await pool.query(sql, params);
+        res.json(r);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+app.get('/api/list', (req, res) => q(res, 'SELECT group_id, group_name, host_name FROM DIARY_GROUPS ORDER BY updated_at DESC'));
 
 app.post('/api/create', async (req, res) => {
+    const id = crypto.randomUUID().substring(0, 8).toUpperCase();
     try {
-        const { name, host, pass } = req.body;
-        const id = crypto.randomUUID().substring(0, 8).toUpperCase();
-        await pool.query(
-            'INSERT INTO DIARY_GROUPS (group_id, group_name, host_name, password) VALUES (?, ?, ?, ?)',
-            [id, name, host, pass]
-        );
+        await pool.query('INSERT INTO DIARY_GROUPS (group_id, group_name, host_name, password) VALUES (?, ?, ?, ?)', [id, req.body.name, req.body.host, req.body.pass]);
         res.json({ success: true, id });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 庭園データ取得：画像が圧縮されていれば、ここでの読み込みが劇的に速くなる
-app.get('/api/entries', async (req, res) => {
-    try {
-        const { groupId } = req.query;
-        const [rows] = await pool.query('SELECT id, group_id, diary_date, message, image_data, color, created_at FROM DIARY_ENTRIES WHERE group_id = ? ORDER BY created_at ASC', [groupId]);
-        res.json(rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
+app.get('/api/entries', (req, res) => q(res, 'SELECT * FROM DIARY_ENTRIES WHERE group_id = ?', [req.query.groupId]));
 
 app.post('/api/addEntry', async (req, res) => {
-    try {
-        const { groupId, date, message, photo, color } = req.body;
-        await pool.query(
-            'INSERT INTO DIARY_ENTRIES (group_id, diary_date, message, image_data, color) VALUES (?, ?, ?, ?, ?)',
-            [groupId, date, message, photo, color]
-        );
-        await pool.query('UPDATE DIARY_GROUPS SET updated_at = NOW() WHERE group_id = ?', [groupId]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    await pool.query('INSERT INTO DIARY_ENTRIES (group_id, diary_date, message, image_data, color) VALUES (?, ?, ?, ?, ?)', [req.body.groupId, req.body.date, req.body.message, req.body.photo, req.body.color]);
+    q(res, 'UPDATE DIARY_GROUPS SET updated_at = NOW() WHERE group_id = ?', [req.body.groupId]);
 });
 
-app.post('/api/deleteEntry', async (req, res) => {
-    try {
-        const { entryId } = req.body;
-        await pool.query('DELETE FROM DIARY_ENTRIES WHERE id = ?', [entryId]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
+app.post('/api/deleteEntry', (req, res) => q(res, 'DELETE FROM DIARY_ENTRIES WHERE id = ?', [req.body.entryId]));
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`--- LUMINA Optimized Server started ---`));
+app.listen(process.env.PORT || 8080);
